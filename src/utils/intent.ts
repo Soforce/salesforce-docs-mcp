@@ -119,6 +119,27 @@ const INTENT_PATTERNS: IntentPattern[] = [
     
     // Release Notes
     { keywords: ['release notes', 'new feature', 'summer', 'winter', 'spring'], category: 'release_notes', subcategory: 'release_notes', weight: 8 },
+
+    // ============ TM Forum (TMF) ============
+    // Open API specs — routed to a domain
+    { keywords: ['product catalog', 'tmf620', 'product ordering', 'tmf622', 'product inventory', 'tmf637', 'productoffering'], category: 'tmf_open_api', subcategory: 'tmf_product', weight: 10 },
+    { keywords: ['service catalog', 'tmf633', 'service ordering', 'tmf641', 'service inventory', 'tmf638', 'service activation', 'service qualification'], category: 'tmf_open_api', subcategory: 'tmf_service', weight: 10 },
+    { keywords: ['resource catalog', 'resource inventory', 'tmf639', 'resource function', 'tmf664', 'resource activation'], category: 'tmf_open_api', subcategory: 'tmf_resource', weight: 10 },
+    { keywords: ['party management', 'tmf632', 'customer management', 'tmf629', 'party role', 'individual', 'organization', 'user role permission'], category: 'tmf_open_api', subcategory: 'tmf_party', weight: 9 },
+    { keywords: ['account management', 'tmf666', 'bill', 'tmf678', 'payment', 'usage management', 'tmf635'], category: 'tmf_open_api', subcategory: 'tmf_billing', weight: 8 },
+    { keywords: ['open api', 'tmf api', 'tmforum api', 'swagger', 'openapi'], category: 'tmf_open_api', subcategory: 'tmf_common', weight: 8 },
+
+    // SID — Information Framework
+    { keywords: ['sid', 'information framework', 'shared information data', 'information model', 'abe', 'aggregate business entity'], category: 'tmf_sid', subcategory: 'tmf_common', weight: 10 },
+    { keywords: ['gb922', 'sid model', 'entity model'], category: 'tmf_sid', subcategory: 'tmf_common', weight: 12 },
+
+    // eTOM — Business Process Framework
+    { keywords: ['etom', 'business process framework', 'gb921', 'process decomposition', 'level 2 process', 'level 3 process'], category: 'tmf_etom', subcategory: 'tmf_process', weight: 10 },
+
+    // Best practice / ODA / Frameworx / guidebooks
+    { keywords: ['oda', 'open digital architecture', 'ig1167', 'oda component', 'oda canvas'], category: 'tmf_best_practice', subcategory: 'tmf_oda', weight: 10 },
+    { keywords: ['frameworx', 'tam', 'application framework', 'guidebook', 'implementation guide', 'gb929'], category: 'tmf_best_practice', subcategory: 'tmf_guidebook', weight: 8 },
+    { keywords: ['tm forum', 'tmforum', 'tmf best practice'], category: 'tmf_best_practice', subcategory: 'tmf_guidebook', weight: 6 },
 ];
 
 // Synonym mappings for query expansion
@@ -195,7 +216,7 @@ export function detectIntent(query: string): DetectedIntent {
  */
 export function describeIntent(intent: DetectedIntent): string {
     if (!intent.category) {
-        return 'General Salesforce documentation search';
+        return 'General documentation search';
     }
     
     const categoryLabels: Record<string, string> = {
@@ -206,9 +227,13 @@ export function describeIntent(intent: DetectedIntent): string {
         'security': 'Security & Permissions',
         'integration': 'Integration Patterns',
         'best_practices': 'Best Practices',
-        'release_notes': 'Release Notes'
+        'release_notes': 'Release Notes',
+        'tmf_open_api': 'TMF Open API Specifications',
+        'tmf_sid': 'TMF SID (Information Framework)',
+        'tmf_etom': 'TMF eTOM (Process Framework)',
+        'tmf_best_practice': 'TMF Guidebooks & ODA'
     };
-    
+
     const subcategoryLabels: Record<string, string> = {
         'apex': 'Apex Development',
         'lightning': 'Lightning (LWC/Aura)',
@@ -234,9 +259,18 @@ export function describeIntent(intent: DetectedIntent): string {
         'marketing_cloud': 'Marketing Cloud',
         'analytics_cloud': 'CRM Analytics',
         'best_practices': 'Best Practices',
-        'release_notes': 'Release Notes'
+        'release_notes': 'Release Notes',
+        'tmf_product': 'Product Domain',
+        'tmf_service': 'Service Domain',
+        'tmf_resource': 'Resource Domain',
+        'tmf_party': 'Party / Customer Domain',
+        'tmf_billing': 'Account & Billing Domain',
+        'tmf_common': 'Common / Cross-Domain',
+        'tmf_oda': 'Open Digital Architecture',
+        'tmf_guidebook': 'Guidebook / Frameworx',
+        'tmf_process': 'eTOM Process'
     };
-    
+
     const categoryLabel = categoryLabels[intent.category] || intent.category;
     const subcategoryLabel = intent.subcategory ? subcategoryLabels[intent.subcategory] || intent.subcategory : '';
     
@@ -324,8 +358,18 @@ function getCategoryTerms(subcategory: string): string[] {
         'sfdx_cli': ['sf', 'scratch org', 'source push', 'dev hub'],
         'security': ['permission set', 'sharing', 'FLS', 'profile', 'oauth'],
         'integration': ['callout', 'HTTP', 'external service', 'named credential'],
+        // TM Forum domains
+        'tmf_product': ['product catalog', 'product offering', 'product ordering', 'TMF620', 'TMF622'],
+        'tmf_service': ['service catalog', 'service ordering', 'service inventory', 'TMF641', 'service activation'],
+        'tmf_resource': ['resource catalog', 'resource inventory', 'resource function', 'TMF639'],
+        'tmf_party': ['party', 'customer management', 'individual', 'organization', 'TMF632'],
+        'tmf_billing': ['account', 'billing', 'payment', 'usage', 'TMF666', 'TMF678'],
+        'tmf_common': ['open api', 'schema', 'REST', 'resource model'],
+        'tmf_oda': ['ODA', 'open digital architecture', 'component', 'canvas'],
+        'tmf_guidebook': ['guidebook', 'frameworx', 'best practice', 'implementation guide'],
+        'tmf_process': ['eTOM', 'process', 'level 2', 'level 3', 'decomposition'],
     };
-    
+
     return categoryTerms[subcategory] || [];
 }
 

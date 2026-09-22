@@ -157,7 +157,11 @@ export function formatCategories(categories: Array<{ category: string; count: nu
         "security": "Security & Identity: Authentication, Authorization, Sharing, Secure Coding",
         "integration": "Integration: Patterns, Connectors, Canvas, Federated Search",
         "best_practices": "Best Practices: Large Data Volumes, Governor Limits, Performance",
-        "release_notes": "Release Notes: Feature updates from Winter '15 to present"
+        "release_notes": "Release Notes: Feature updates from Winter '15 to present",
+        "tmf_open_api": "TMF Open API specifications (TMFxxx) across Product, Service, Resource, Party & Billing domains",
+        "tmf_sid": "TMF SID / Information Framework (GB922): shared information & data model, ABEs",
+        "tmf_etom": "TMF eTOM / Business Process Framework (GB921): process decompositions",
+        "tmf_best_practice": "TMF Guidebooks, Open Digital Architecture (ODA), Frameworx & implementation guides"
     };
 
     for (const cat of categories) {
@@ -364,7 +368,8 @@ export function formatDocumentSummaries(summaries: DocumentSummary[]): string {
         lines.push(``);
 
         for (const doc of docs) {
-            lines.push(`**${doc.title}** (ID: ${doc.id})`);
+            const sourceTag = doc.source ? ` [${doc.source}]` : '';
+            lines.push(`**${doc.title}** (ID: ${doc.id})${sourceTag}`);
             lines.push(`  - File: \`${doc.fileName}\``);
             if (doc.description) {
                 const shortDesc = doc.description.length > 150 

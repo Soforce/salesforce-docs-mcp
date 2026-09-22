@@ -89,6 +89,7 @@ export async function initializeDatabase(): Promise<void> {
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             file_name TEXT NOT NULL UNIQUE,
             file_path TEXT NOT NULL,
+            source TEXT NOT NULL DEFAULT 'salesforce',
             category TEXT NOT NULL,
             subcategory TEXT,
             doc_type TEXT NOT NULL DEFAULT 'developer_guide',
@@ -122,6 +123,7 @@ export async function initializeDatabase(): Promise<void> {
     // and SQLite's built-in text functions for searching
 
     // Create indexes for common queries
+    db.run(`CREATE INDEX IF NOT EXISTS idx_documents_source ON documents(source)`);
     db.run(`CREATE INDEX IF NOT EXISTS idx_documents_category ON documents(category)`);
     db.run(`CREATE INDEX IF NOT EXISTS idx_documents_subcategory ON documents(subcategory)`);
     db.run(`CREATE INDEX IF NOT EXISTS idx_documents_priority ON documents(priority DESC)`);
