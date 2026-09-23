@@ -161,19 +161,46 @@ salesforce-docs-mcp/
 │       ├── classifier.ts     # Document classification
 │       └── chunker.ts        # PDF text chunking
 ├── scripts/
-│   ├── build-index.ts        # PDF parsing and indexing
+│   ├── build-index.ts        # Multi-source PDF parsing and indexing
 │   ├── test-search.ts        # Search testing (114 tests)
 │   ├── test-llm-judge.ts     # LLM-as-judge evaluation
 │   └── postinstall.js        # Post-install setup
 ├── docs/
-│   ├── pdfs/                 # 291 Salesforce developer PDFs
-│   └── release-notes/        # 69 release notes PDFs
+│   ├── pdfs/                 # Salesforce developer PDFs (source: salesforce)
+│   ├── release-notes/        # Salesforce release notes PDFs (source: salesforce)
+│   └── tmf/                   # TM Forum PDFs (source: tmf)
+│       └── README.md         # TMF naming conventions & indexing guide
 ├── data/
-│   └── salesforce-docs.db    # SQLite search index (357 docs)
+│   └── salesforce-docs.db    # Unified SQLite search index (salesforce + tmf)
 ├── package.json
 ├── tsconfig.json
 └── README.md
 ```
+
+## 📡 TM Forum (TMF) Support
+
+In addition to Salesforce docs, this server can index **TM Forum** standards in a
+unified corpus. Every document carries a `source` (`salesforce` | `tmf`) so you can
+search across both or scope to one.
+
+Supported TMF families:
+
+| Category | Contents |
+|----------|----------|
+| `tmf_open_api` | Open API specs (TMFxxx) — Product, Service, Resource, Party, Billing domains |
+| `tmf_sid` | SID / Information Framework (GB922) |
+| `tmf_etom` | eTOM / Business Process Framework (GB921) |
+| `tmf_best_practice` | ODA, Frameworx, guidebooks (GBxxx) & implementation guides (IGxxx) |
+
+**Adding TMF docs:** drop PDFs into `docs/tmf/` (see [`docs/tmf/README.md`](docs/tmf/README.md)
+for naming conventions), then index just TMF without re-parsing Salesforce docs:
+
+```bash
+npm run build-index -- --source tmf
+```
+
+**TMF tools:** `search_tmf_docs`, `get_tmf_api`, plus `search_salesforce_docs` /
+`semantic_search_docs` / `get_document_summaries` all accept a `source: "tmf"` filter.
 
 ## 📥 Adding Documentation
 
@@ -182,6 +209,9 @@ Download Salesforce PDFs to `docs/pdfs/` then rebuild the index:
 ```bash
 npm run build-index
 ```
+
+> A full rebuild reindexes **all** sources. To (re)index a single source without
+> touching the others, pass `--source salesforce` or `--source tmf`.
 
 PDFs can be downloaded from:
 ```

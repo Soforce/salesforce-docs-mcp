@@ -1,9 +1,20 @@
 /**
- * Type definitions for Salesforce Docs MCP Server
+ * Type definitions for the Docs MCP Server
+ *
+ * The server hosts a unified corpus spanning multiple sources (Salesforce
+ * developer documentation and TM Forum standards). The `source` dimension lets
+ * searches span everything or scope to a single standards body.
  */
+
+// Corpus source / standards body a document belongs to
+export enum DocSource {
+    SALESFORCE = "salesforce",
+    TMF = "tmf"
+}
 
 // Document categories matching the architecture design
 export enum DocCategory {
+    // ---- Salesforce ----
     CORE_PLATFORM = "core_platform",
     APIS = "apis",
     DEV_TOOLS = "dev_tools",
@@ -11,7 +22,13 @@ export enum DocCategory {
     SECURITY = "security",
     INTEGRATION = "integration",
     BEST_PRACTICES = "best_practices",
-    RELEASE_NOTES = "release_notes"
+    RELEASE_NOTES = "release_notes",
+
+    // ---- TM Forum (TMF) ----
+    TMF_OPEN_API = "tmf_open_api",       // TMFxxx Open API specifications
+    TMF_SID = "tmf_sid",                 // Shared Information/Data model (GB922)
+    TMF_ETOM = "tmf_etom",               // Business Process Framework / eTOM (GB921)
+    TMF_BEST_PRACTICE = "tmf_best_practice" // Guidebooks, ODA, Frameworx, IGxxx
 }
 
 // Document types
@@ -21,7 +38,13 @@ export enum DocType {
     CHEATSHEET = "cheatsheet",
     IMPLEMENTATION_GUIDE = "implementation_guide",
     RELEASE_NOTES = "release_notes",
-    WORKBOOK = "workbook"
+    WORKBOOK = "workbook",
+
+    // ---- TM Forum ----
+    API_SPECIFICATION = "api_specification",   // TMF Open API spec
+    INFORMATION_MODEL = "information_model",    // SID
+    PROCESS_FRAMEWORK = "process_framework",    // eTOM
+    GUIDEBOOK = "guidebook"                      // TMF guidebook / ODA
 }
 
 // Subcategories
@@ -58,8 +81,27 @@ export enum Subcategory {
     
     // Release Notes
     CURRENT = "current",
-    HISTORICAL = "historical"
+    HISTORICAL = "historical",
+
+    // ---- TM Forum domains (shared across Open API & SID) ----
+    TMF_PRODUCT = "tmf_product",       // Product domain (catalog, ordering, inventory)
+    TMF_SERVICE = "tmf_service",       // Service domain (ordering, inventory, activation)
+    TMF_RESOURCE = "tmf_resource",     // Resource domain (function, inventory)
+    TMF_PARTY = "tmf_party",           // Party / Customer / engagement domain
+    TMF_BILLING = "tmf_billing",       // Account, billing, revenue
+    TMF_COMMON = "tmf_common",         // Common / cross-domain APIs & entities
+    // ---- TM Forum best-practice subtypes ----
+    TMF_ODA = "tmf_oda",               // Open Digital Architecture
+    TMF_GUIDEBOOK = "tmf_guidebook",   // General guidebooks / Frameworx / TAM
+    TMF_PROCESS = "tmf_process"        // eTOM process decompositions
 }
+
+// Ordered list of every category value. Single source of truth for the zod
+// enums used by the MCP tool schemas (avoids repeating the list per tool).
+export const DOC_CATEGORY_VALUES = Object.values(DocCategory) as [string, ...string[]];
+
+// Ordered list of every source value, for source-filter tool schemas.
+export const DOC_SOURCE_VALUES = Object.values(DocSource) as [string, ...string[]];
 
 // Human-readable category labels
 export const CATEGORY_LABELS: Record<DocCategory, string> = {
@@ -70,7 +112,11 @@ export const CATEGORY_LABELS: Record<DocCategory, string> = {
     [DocCategory.SECURITY]: "Security & Identity",
     [DocCategory.INTEGRATION]: "Integration Patterns",
     [DocCategory.BEST_PRACTICES]: "Best Practices & Limits",
-    [DocCategory.RELEASE_NOTES]: "Release Notes"
+    [DocCategory.RELEASE_NOTES]: "Release Notes",
+    [DocCategory.TMF_OPEN_API]: "TMF Open API Specifications",
+    [DocCategory.TMF_SID]: "TMF SID (Information Framework)",
+    [DocCategory.TMF_ETOM]: "TMF eTOM (Business Process Framework)",
+    [DocCategory.TMF_BEST_PRACTICE]: "TMF Guidebooks, ODA & Best Practices"
 };
 
 export const SUBCATEGORY_LABELS: Record<Subcategory, string> = {
@@ -97,7 +143,16 @@ export const SUBCATEGORY_LABELS: Record<Subcategory, string> = {
     [Subcategory.ANALYTICS_CLOUD]: "CRM Analytics",
     [Subcategory.INDUSTRY_CLOUDS]: "Industry Clouds",
     [Subcategory.CURRENT]: "Current Releases",
-    [Subcategory.HISTORICAL]: "Historical Releases"
+    [Subcategory.HISTORICAL]: "Historical Releases",
+    [Subcategory.TMF_PRODUCT]: "Product Domain",
+    [Subcategory.TMF_SERVICE]: "Service Domain",
+    [Subcategory.TMF_RESOURCE]: "Resource Domain",
+    [Subcategory.TMF_PARTY]: "Party / Customer Domain",
+    [Subcategory.TMF_BILLING]: "Account & Billing Domain",
+    [Subcategory.TMF_COMMON]: "Common / Cross-Domain",
+    [Subcategory.TMF_ODA]: "Open Digital Architecture",
+    [Subcategory.TMF_GUIDEBOOK]: "Guidebook / Frameworx",
+    [Subcategory.TMF_PROCESS]: "eTOM Process"
 };
 
 // Document metadata interface
@@ -105,6 +160,7 @@ export interface DocumentMetadata {
     id: number;
     fileName: string;
     filePath: string;
+    source: DocSource;
     category: DocCategory;
     subcategory: string;
     docType: DocType;
@@ -146,6 +202,7 @@ export interface SearchResult {
 
 // Search options
 export interface SearchOptions {
+    source?: DocSource;
     category?: DocCategory;
     subcategory?: string;
     docType?: DocType;

@@ -18,17 +18,25 @@ import { searchDocuments, getDocumentById, getDocumentByFileName, getDocumentCon
 import { formatSearchResults, formatDocument, formatCategories, formatCodeExamples, formatQueryExpansion, formatDocumentSummaries } from "./utils/formatter.js";
 import { expandQueryToKeywords } from "./utils/intent.js";
 import { getDatabase, initializeDatabase } from "./db/database.js";
-import { 
-    DocCategory, 
-    CATEGORY_LABELS, 
+import {
+    DocCategory,
+    DocSource,
+    CATEGORY_LABELS,
     SUBCATEGORY_LABELS,
-    SearchOptions 
+    DOC_CATEGORY_VALUES,
+    DOC_SOURCE_VALUES,
+    SearchOptions
 } from "./types.js";
+
+// Shared enum tuples for zod (single source of truth is types.ts)
+const CategoryEnum = z.enum(DOC_CATEGORY_VALUES);
+const SourceEnum = z.enum(DOC_SOURCE_VALUES);
 
 // Zod schemas for input validation
 const SearchDocsSchema = z.object({
     query: z.string().min(1).max(500),
-    category: z.enum(["core_platform", "apis", "dev_tools", "clouds", "security", "integration", "best_practices", "release_notes"]).optional(),
+    source: SourceEnum.optional(),
+    category: CategoryEnum.optional(),
     maxResults: z.number().int().min(1).max(20).optional().default(5)
 });
 
@@ -64,22 +72,37 @@ const ExpandQuerySchema = z.object({
 });
 
 const DocumentSummariesSchema = z.object({
-    category: z.enum(["core_platform", "apis", "dev_tools", "clouds", "security", "integration", "best_practices", "release_notes"]).optional(),
+    source: SourceEnum.optional(),
+    category: CategoryEnum.optional(),
     limit: z.number().int().min(1).max(50).optional().default(20)
 });
 
 const SemanticSearchSchema = z.object({
     query: z.string().min(1).max(500),
     expandedTerms: z.array(z.string()).optional(),
-    category: z.enum(["core_platform", "apis", "dev_tools", "clouds", "security", "integration", "best_practices", "release_notes"]).optional(),
+    source: SourceEnum.optional(),
+    category: CategoryEnum.optional(),
     maxResults: z.number().int().min(1).max(20).optional().default(5)
+});
+
+// A TMF-scoped search is just a normal search pinned to source=tmf.
+const TmfSearchSchema = z.object({
+    query: z.string().min(1).max(500),
+    category: z.enum(["tmf_open_api", "tmf_sid", "tmf_etom", "tmf_best_practice"]).optional(),
+    maxResults: z.number().int().min(1).max(20).optional().default(5)
+});
+
+// Look up a specific TMF Open API specification.
+const TmfApiSchema = z.object({
+    apiName: z.string().min(1).max(200),
+    resource: z.string().max(500).optional()
 });
 
 // Server instance
 const server = new Server(
     {
         name: "salesforce-docs-mcp",
-        version: "1.0.0",
+        version: "1.1.0",
     },
     {
         capabilities: {
@@ -92,28 +115,30 @@ const server = new Server(
 const TOOLS = [
     {
         name: "search_salesforce_docs",
-        description: `Search Salesforce documentation with relevance-ranked results.
-Searches across 360 official Salesforce PDF documents including:
-- Apex Developer Guide & Reference
-- REST API, SOAP API, Metadata API, Bulk API
-- Lightning Web Components (LWC)
-- Visualforce, SOQL/SOSL
-- Integration patterns, Security guides
-- Release notes (last 10 years)
+        description: `Search the unified documentation corpus with relevance-ranked results.
+Covers two sources:
+- Salesforce developer docs: Apex, LWC, Visualforce, SOQL/SOSL, REST/SOAP/Metadata/Bulk APIs, security, integration, release notes.
+- TM Forum (TMF) standards: Open API specs (TMFxxx), SID/Information Framework (GB922), eTOM/Business Process Framework (GB921), ODA, guidebooks & best practices.
 
-Results are ranked by match density (how many search terms appear) combined with document priority.
+Use the optional 'source' filter (salesforce | tmf) to scope to one standards body, or omit it to search everything.
+Results are ranked by match density combined with document priority.
 Returns document ID, relevant excerpts, and source information.`,
         inputSchema: {
             type: "object",
             properties: {
                 query: {
                     type: "string",
-                    description: "Natural language search query (e.g., 'How to create an Apex trigger', 'REST API authentication')"
+                    description: "Natural language search query (e.g., 'How to create an Apex trigger', 'TMF620 product catalog', 'eTOM order handling')"
+                },
+                source: {
+                    type: "string",
+                    enum: DOC_SOURCE_VALUES,
+                    description: "Filter by corpus source: 'salesforce' or 'tmf' (optional)"
                 },
                 category: {
                     type: "string",
-                    enum: ["core_platform", "apis", "dev_tools", "clouds", "security", "integration", "best_practices", "release_notes"],
-                    description: "Filter by documentation category (optional)"
+                    enum: DOC_CATEGORY_VALUES,
+                    description: "Filter by documentation category (optional). TMF categories: tmf_open_api, tmf_sid, tmf_etom, tmf_best_practice"
                 },
                 maxResults: {
                     type: "number",
@@ -264,9 +289,14 @@ Useful for:
         inputSchema: {
             type: "object",
             properties: {
+                source: {
+                    type: "string",
+                    enum: DOC_SOURCE_VALUES,
+                    description: "Filter by corpus source: 'salesforce' or 'tmf' (optional)"
+                },
                 category: {
                     type: "string",
-                    enum: ["core_platform", "apis", "dev_tools", "clouds", "security", "integration", "best_practices", "release_notes"],
+                    enum: DOC_CATEGORY_VALUES,
                     description: "Filter by documentation category (optional)"
                 },
                 limit: {
@@ -302,9 +332,14 @@ Returns more relevant results for vibe-style questions.`,
                     items: { type: "string" },
                     description: "Expanded search terms from expand_search_query"
                 },
+                source: {
+                    type: "string",
+                    enum: DOC_SOURCE_VALUES,
+                    description: "Filter by corpus source: 'salesforce' or 'tmf' (optional)"
+                },
                 category: {
                     type: "string",
-                    enum: ["core_platform", "apis", "dev_tools", "clouds", "security", "integration", "best_practices", "release_notes"],
+                    enum: DOC_CATEGORY_VALUES,
                     description: "Filter by documentation category (optional)"
                 },
                 maxResults: {
@@ -316,6 +351,60 @@ Returns more relevant results for vibe-style questions.`,
                 }
             },
             required: ["query"]
+        }
+    },
+    // ============ TM FORUM TOOLS ============
+    {
+        name: "search_tmf_docs",
+        description: `Search only the TM Forum (TMF) standards corpus.
+Convenience wrapper around search that pins source=tmf. Covers:
+- Open API specifications (TMFxxx) — Product, Service, Resource, Party, Billing domains
+- SID / Information Framework (GB922)
+- eTOM / Business Process Framework (GB921)
+- ODA, Frameworx, guidebooks and implementation guides
+
+Use this when you specifically want telecom/BSS-OSS standards rather than Salesforce docs.`,
+        inputSchema: {
+            type: "object",
+            properties: {
+                query: {
+                    type: "string",
+                    description: "Natural language query (e.g., 'product ordering state machine', 'SID party role model', 'eTOM level 2 processes')"
+                },
+                category: {
+                    type: "string",
+                    enum: ["tmf_open_api", "tmf_sid", "tmf_etom", "tmf_best_practice"],
+                    description: "Filter to a TMF category (optional)"
+                },
+                maxResults: {
+                    type: "number",
+                    minimum: 1,
+                    maximum: 20,
+                    default: 5,
+                    description: "Maximum number of results to return (default: 5)"
+                }
+            },
+            required: ["query"]
+        }
+    },
+    {
+        name: "get_tmf_api",
+        description: `Look up a specific TM Forum Open API specification.
+Provide the API name or number (e.g., 'TMF620', 'Product Catalog Management', 'TMF641 Service Ordering')
+and optionally a specific resource or operation to focus on (e.g., 'ProductOrder', 'GET /productOrder').`,
+        inputSchema: {
+            type: "object",
+            properties: {
+                apiName: {
+                    type: "string",
+                    description: "TMF API name or number (e.g., 'TMF620', 'Product Ordering Management')"
+                },
+                resource: {
+                    type: "string",
+                    description: "Specific resource, entity, or operation to look up (optional)"
+                }
+            },
+            required: ["apiName"]
         }
     }
 ];
@@ -340,10 +429,11 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
                         isError: true
                     };
                 }
-                const { query, category, maxResults } = parseResult.data;
+                const { query, source, category, maxResults } = parseResult.data;
 
                 // Intent detection is handled internally by searchDocuments
                 const options: SearchOptions = {
+                    source: source as DocSource | undefined,
                     category: category as DocCategory | undefined,
                     maxResults
                 };
@@ -526,9 +616,9 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
                         isError: true
                     };
                 }
-                const { category, limit } = parseResult.data;
+                const { source, category, limit } = parseResult.data;
 
-                const summaries = await getDocumentSummaries(category as DocCategory | undefined, limit);
+                const summaries = await getDocumentSummaries(category as DocCategory | undefined, limit, source as DocSource | undefined);
                 const formatted = formatDocumentSummaries(summaries);
                 
                 return {
@@ -544,7 +634,7 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
                         isError: true
                     };
                 }
-                const { query, expandedTerms, category, maxResults } = parseResult.data;
+                const { query, expandedTerms, source, category, maxResults } = parseResult.data;
 
                 // Combine original query with expanded terms for broader search
                 const combinedQuery = expandedTerms && expandedTerms.length > 0
@@ -552,6 +642,7 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
                     : query;
 
                 const options: SearchOptions = {
+                    source: source as DocSource | undefined,
                     category: category as DocCategory | undefined,
                     maxResults,
                     intent: "semantic_search"
@@ -565,6 +656,54 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
                     formatted = `🧠 **Semantic Search Active**\nExpanded terms: ${expandedTerms.join(', ')}\n\n${formatted}`;
                 }
 
+                return {
+                    content: [{ type: "text", text: formatted }]
+                };
+            }
+
+            // ============ TM FORUM TOOL HANDLERS ============
+
+            case "search_tmf_docs": {
+                const parseResult = TmfSearchSchema.safeParse(args);
+                if (!parseResult.success) {
+                    return {
+                        content: [{ type: "text", text: `Validation error: ${parseResult.error.errors.map(e => e.message).join(', ')}` }],
+                        isError: true
+                    };
+                }
+                const { query, category, maxResults } = parseResult.data;
+
+                const results = await searchDocuments(query, {
+                    source: DocSource.TMF,
+                    category: category as DocCategory | undefined,
+                    maxResults
+                });
+
+                const formatted = formatSearchResults(results, query);
+                return {
+                    content: [{ type: "text", text: formatted }]
+                };
+            }
+
+            case "get_tmf_api": {
+                const parseResult = TmfApiSchema.safeParse(args);
+                if (!parseResult.success) {
+                    return {
+                        content: [{ type: "text", text: `Validation error: ${parseResult.error.errors.map(e => e.message).join(', ')}` }],
+                        isError: true
+                    };
+                }
+                const { apiName, resource } = parseResult.data;
+
+                const query = resource ? `${apiName} ${resource}` : apiName;
+                const results = await searchDocuments(query, {
+                    source: DocSource.TMF,
+                    category: DocCategory.TMF_OPEN_API,
+                    maxResults: 5,
+                    intent: "api_reference"
+                });
+
+                const formatted = formatSearchResults(results, query);
                 return {
                     content: [{ type: "text", text: formatted }]
                 };

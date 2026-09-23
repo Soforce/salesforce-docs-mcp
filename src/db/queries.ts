@@ -5,11 +5,12 @@
  */
 
 import { getDatabase } from "./database.js";
-import { 
-    DocumentMetadata, 
-    SearchResult, 
-    SearchOptions, 
-    DocCategory 
+import {
+    DocumentMetadata,
+    SearchResult,
+    SearchOptions,
+    DocCategory,
+    DocSource
 } from "../types.js";
 import { LRUCache } from "lru-cache";
 import { detectIntent, describeIntent } from "../utils/intent.js";
@@ -73,6 +74,7 @@ export async function searchDocuments(
     // Determine effective filters: user-provided > intent-detected
     let effectiveCategory = options.category;
     let effectiveSubcategory = options.subcategory;
+    const effectiveSource = options.source; // explicit source scoping only
     let usedIntentFilter = false;
     
     // Apply intent-based filtering if no explicit filter and confidence is sufficient
@@ -83,11 +85,12 @@ export async function searchDocuments(
     }
     
     // Check cache (include effective filters in cache key)
-    const cacheKey = JSON.stringify({ 
-        query: sanitizedQuery, 
+    const cacheKey = JSON.stringify({
+        query: sanitizedQuery,
         options,
         effectiveCategory,
-        effectiveSubcategory
+        effectiveSubcategory,
+        effectiveSource
     });
     const cached = searchCache.get(cacheKey);
     if (cached) {
@@ -106,28 +109,33 @@ export async function searchDocuments(
      * Execute search with given filters and return scored results
      */
     const executeSearch = (
-        category: string | undefined, 
+        category: string | undefined,
         subcategory: string | undefined,
-        sampleSize: number
+        sampleSize: number,
+        source: string | undefined
     ): SearchResult[] => {
         const params: any[] = [];
-        
+
         // Build WHERE clause with LIKE conditions
         const likeConditions = searchPatterns.map((pattern) => {
             params.push(pattern);
             return `c.content_lower LIKE ?`;
         }).join(' OR ');
-        
+
         let sql = `
-            SELECT 
-                d.id, d.file_name, d.file_path, d.category, d.subcategory,
+            SELECT
+                d.id, d.file_name, d.file_path, d.source, d.category, d.subcategory,
                 d.doc_type, d.title, d.description, d.keywords, d.api_version, d.priority,
                 c.content, c.content_lower, c.section_title, c.page_number
             FROM chunks c
             JOIN documents d ON c.document_id = d.id
             WHERE (${likeConditions})
         `;
-        
+
+        if (source) {
+            sql += ` AND d.source = ?`;
+            params.push(source);
+        }
         if (category) {
             sql += ` AND d.category = ?`;
             params.push(category);
@@ -186,6 +194,7 @@ export async function searchDocuments(
                     id: getValue('id') as number,
                     fileName: getValue('file_name') as string,
                     filePath: getValue('file_path') as string,
+                    source: (getValue('source') as DocSource) || DocSource.SALESFORCE,
                     category: getValue('category') as DocCategory,
                     subcategory: getValue('subcategory') as string,
                     docType: getValue('doc_type') as any,
@@ -219,19 +228,20 @@ export async function searchDocuments(
         const sampleSize = isFiltered ? Math.max(maxResults * 10, 100) : Math.max(maxResults * 50, 500);
         
         // First search: with intent-based or user-provided filters
-        let results = executeSearch(effectiveCategory, effectiveSubcategory, sampleSize);
-        
+        // (source scoping, when supplied, is preserved across every fallback)
+        let results = executeSearch(effectiveCategory, effectiveSubcategory, sampleSize, effectiveSource);
+
         // Fallback: if intent filter yielded too few results, try broader search
         if (usedIntentFilter && results.length < maxResults) {
             // Try category-only (drop subcategory)
-            const categoryResults = executeSearch(effectiveCategory, undefined, sampleSize);
+            const categoryResults = executeSearch(effectiveCategory, undefined, sampleSize, effectiveSource);
             if (categoryResults.length > results.length) {
                 results = categoryResults;
             }
-            
-            // If still too few, try unfiltered
+
+            // If still too few, try unfiltered (still scoped to source if provided)
             if (results.length < maxResults) {
-                const unfilteredResults = executeSearch(undefined, undefined, 500);
+                const unfilteredResults = executeSearch(undefined, undefined, 500, effectiveSource);
                 if (unfilteredResults.length > results.length) {
                     results = unfilteredResults;
                 }
@@ -312,6 +322,7 @@ export async function getDocumentByFileName(fileName: string): Promise<DocumentM
         id: getValue('id') as number,
         fileName: getValue('file_name') as string,
         filePath: getValue('file_path') as string,
+        source: (getValue('source') as DocSource) || DocSource.SALESFORCE,
         category: getValue('category') as DocCategory,
         subcategory: getValue('subcategory') as string,
         docType: getValue('doc_type') as any,
@@ -358,6 +369,7 @@ export async function getDocumentById(id: number): Promise<DocumentMetadata | nu
         id: getValue('id') as number,
         fileName: getValue('file_name') as string,
         filePath: getValue('file_path') as string,
+        source: (getValue('source') as DocSource) || DocSource.SALESFORCE,
         category: getValue('category') as DocCategory,
         subcategory: getValue('subcategory') as string,
         docType: getValue('doc_type') as any,
@@ -528,6 +540,7 @@ export async function getDocumentsByCategory(
             id: getValue('id') as number,
             fileName: getValue('file_name') as string,
             filePath: getValue('file_path') as string,
+            source: (getValue('source') as DocSource) || DocSource.SALESFORCE,
             category: getValue('category') as DocCategory,
             subcategory: getValue('subcategory') as string,
             docType: getValue('doc_type') as any,
@@ -551,6 +564,7 @@ export interface DocumentSummary {
     fileName: string;
     title: string;
     description: string;
+    source: string;
     category: string;
     subcategory: string;
     keywords: string[];
@@ -562,21 +576,30 @@ export interface DocumentSummary {
  */
 export async function getDocumentSummaries(
     category?: DocCategory,
-    limit: number = 20
+    limit: number = 20,
+    source?: DocSource
 ): Promise<DocumentSummary[]> {
     const db = await getDatabase();
-    
+
     let sql = `
-        SELECT id, file_name, title, description, category, subcategory, keywords
+        SELECT id, file_name, title, description, source, category, subcategory, keywords
         FROM documents
     `;
-    
+
     const params: any[] = [];
+    const conditions: string[] = [];
+    if (source) {
+        conditions.push(`source = ?`);
+        params.push(source);
+    }
     if (category) {
-        sql += ` WHERE category = ?`;
+        conditions.push(`category = ?`);
         params.push(category);
     }
-    
+    if (conditions.length > 0) {
+        sql += ` WHERE ${conditions.join(' AND ')}`;
+    }
+
     sql += ` ORDER BY priority DESC, title LIMIT ?`;
     params.push(limit);
     
@@ -601,6 +624,7 @@ export async function getDocumentSummaries(
             fileName: getValue('file_name') as string,
             title: (getValue('title') as string) || getValue('file_name') as string,
             description: (getValue('description') as string) || '',
+            source: (getValue('source') as string) || 'salesforce',
             category: getValue('category') as string,
             subcategory: getValue('subcategory') as string || '',
             keywords: getValue('keywords') ? JSON.parse(getValue('keywords') as string) : []
