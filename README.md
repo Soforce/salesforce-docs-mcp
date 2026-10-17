@@ -1,6 +1,6 @@
 # Salesforce Documentation MCP Server
 
-[![MCP](https://img.shields.io/badge/MCP-Model%20Context%20Protocol-blue)](https://modelcontextprotocol.io/)
+[![MCP](<https://img.shields.io/badge/MCP-Model%20Context%20Protocol-blue>)](https://modelcontextprotocol.io/)
 [![Node.js](https://img.shields.io/badge/Node.js-18%2B-green)](https://nodejs.org/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 
@@ -57,6 +57,28 @@ Add to your VS Code MCP configuration (`%APPDATA%\Code\User\mcp.json` on Windows
 }
 ```
 
+### Configure OpenCode MCP
+
+Update opencode.jsonc in the /home/jyue/.config/opencode:
+
+```JSON
+{
+  "$schema": "https://opencode.ai/config.json",
+  "mcp": {
+    "servers": {
+      "salesforce-docs": {
+        "type": "local",
+        "command": [
+          "/usr/bin/node",
+          "/home/jyue/projects/salesforce-docs-mcp/dist/index.js"
+        ],
+        "enabled": true
+      }
+    }
+  }
+}
+```
+
 ### Configure Claude Desktop
 
 Add to your Claude Desktop configuration (`%APPDATA%\Claude\claude_desktop_config.json`):
@@ -75,6 +97,7 @@ Add to your Claude Desktop configuration (`%APPDATA%\Claude\claude_desktop_confi
 ## 🛠️ Available Tools
 
 ### `search_salesforce_docs`
+
 Search across all Salesforce documentation with natural language queries.
 
 ```
@@ -84,6 +107,7 @@ Example: "Lightning Web Component wire service"
 ```
 
 ### `get_api_reference`
+
 Get specific Salesforce API reference documentation.
 
 ```
@@ -92,6 +116,7 @@ Example: API name "Bulk API 2.0", endpoint "jobs"
 ```
 
 ### `get_release_notes`
+
 Get Salesforce release notes for specific releases or features.
 
 ```
@@ -100,6 +125,7 @@ Example: feature "Dynamic Forms"
 ```
 
 ### `get_code_example`
+
 Get code examples from Salesforce documentation.
 
 ```
@@ -107,25 +133,28 @@ Example: topic "trigger on Account", language "apex"
 ```
 
 ### `list_doc_categories`
+
 List all documentation categories with document counts.
 
 ### `get_document`
+
 Get full content of a specific document by ID or filename.
 
 ## 🎯 Intent-Based Search
 
 The MCP server automatically detects the topic of your query and searches in the most relevant documentation:
 
-| Query | Detected Intent | Searches In |
-|-------|-----------------|-------------|
-| "How to create an Apex trigger" | Apex Development | ~15 Apex docs |
-| "REST API OAuth authentication" | REST API | ~10 REST API docs |
-| "LWC wire decorator" | Lightning/LWC | ~12 Lightning docs |
-| "Bulk API 2.0 job" | Bulk API | ~5 Bulk API docs |
-| "sharing rules permission set" | Security | 12 Security docs |
-| "SOQL query limits" | SOQL/SOSL | ~5 SOQL docs |
+| Query                           | Detected Intent  | Searches In        |
+| ------------------------------- | ---------------- | ------------------ |
+| "How to create an Apex trigger" | Apex Development | ~15 Apex docs      |
+| "REST API OAuth authentication" | REST API         | ~10 REST API docs  |
+| "LWC wire decorator"            | Lightning/LWC    | ~12 Lightning docs |
+| "Bulk API 2.0 job"              | Bulk API         | ~5 Bulk API docs   |
+| "sharing rules permission set"  | Security         | 12 Security docs   |
+| "SOQL query limits"             | SOQL/SOSL        | ~5 SOQL docs       |
 
 **Benefits:**
+
 - 🎯 **More relevant results** - Searches in topic-specific docs first
 - ⚡ **Faster queries** - Scans ~15 docs instead of 357
 - 🔄 **Smart fallback** - Expands search if too few results found
@@ -134,16 +163,16 @@ The MCP server automatically detects the topic of your query and searches in the
 
 ## 📁 Documentation Categories
 
-| Category | Description |
-|----------|-------------|
-| `core_platform` | Apex, LWC, Visualforce, SOQL/SOSL, Formulas |
-| `apis` | REST, SOAP, Metadata, Bulk, Tooling APIs |
-| `dev_tools` | Salesforce CLI, VS Code, Packaging |
-| `clouds` | Sales, Service, Experience, Industry Clouds |
-| `security` | Authentication, Authorization, Sharing |
-| `integration` | Integration Patterns, Connectors |
-| `best_practices` | Limits, Performance, Cheatsheets |
-| `release_notes` | Winter '15 to present |
+| Category           | Description                                 |
+| ------------------ | ------------------------------------------- |
+| `core_platform`  | Apex, LWC, Visualforce, SOQL/SOSL, Formulas |
+| `apis`           | REST, SOAP, Metadata, Bulk, Tooling APIs    |
+| `dev_tools`      | Salesforce CLI, VS Code, Packaging          |
+| `clouds`         | Sales, Service, Experience, Industry Clouds |
+| `security`       | Authentication, Authorization, Sharing      |
+| `integration`    | Integration Patterns, Connectors            |
+| `best_practices` | Limits, Performance, Cheatsheets            |
+| `release_notes`  | Winter '15 to present                       |
 
 ## 🏗️ Project Structure
 
@@ -185,12 +214,12 @@ search across both or scope to one.
 
 Supported TMF families:
 
-| Category | Contents |
-|----------|----------|
-| `tmf_open_api` | Open API specs (TMFxxx) — Product, Service, Resource, Party, Billing domains |
-| `tmf_sid` | SID / Information Framework (GB922) |
-| `tmf_etom` | eTOM / Business Process Framework (GB921) |
-| `tmf_best_practice` | ODA, Frameworx, guidebooks (GBxxx) & implementation guides (IGxxx) |
+| Category              | Contents                                                                      |
+| --------------------- | ----------------------------------------------------------------------------- |
+| `tmf_open_api`      | Open API specs (TMFxxx) — Product, Service, Resource, Party, Billing domains |
+| `tmf_sid`           | SID / Information Framework (GB922)                                           |
+| `tmf_etom`          | eTOM / Business Process Framework (GB921)                                     |
+| `tmf_best_practice` | ODA, Frameworx, guidebooks (GBxxx) & implementation guides (IGxxx)            |
 
 **Adding TMF docs:** drop PDFs into `docs/tmf/` (see [`docs/tmf/README.md`](docs/tmf/README.md)
 for naming conventions), then index just TMF without re-parsing Salesforce docs:
@@ -214,6 +243,7 @@ npm run build-index
 > touching the others, pass `--source salesforce` or `--source tmf`.
 
 PDFs can be downloaded from:
+
 ```
 https://resources.docs.salesforce.com/{version}/latest/en-us/sfdc/pdf/{name}.pdf
 ```
@@ -235,15 +265,15 @@ npm run test-search
 
 ## ⚡ Performance
 
-| Metric | Value |
-|--------|--------|
-| PDF Documents | 360 (291 + 69 release notes) |
-| Documents indexed | 357 |
-| Search chunks | ~156,000 |
-| Database size | ~520 MB |
-| Intent-filtered query | < 50ms (scoped search) |
-| Unfiltered query | < 500ms (full corpus) |
-| Cached query | < 10ms |
+| Metric                | Value                        |
+| --------------------- | ---------------------------- |
+| PDF Documents         | 360 (291 + 69 release notes) |
+| Documents indexed     | 357                          |
+| Search chunks         | ~156,000                     |
+| Database size         | ~520 MB                      |
+| Intent-filtered query | < 50ms (scoped search)       |
+| Unfiltered query      | < 500ms (full corpus)        |
+| Cached query          | < 10ms                       |
 
 ### How Intent-Based Search Improves Performance
 
